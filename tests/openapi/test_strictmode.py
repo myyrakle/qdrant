@@ -1728,3 +1728,111 @@ def test_strict_mode_distance_matrix_limits(collection_name):
     )
     assert not response.ok
     assert "Forbidden: Limit exceeded 20 > 15 for \"limit\"" in response.json()['status']['error']
+
+
+def test_strict_mode_group_by_unindexed(collection_name):
+    response = request_with_validation(
+        api="/collections/{collection_name}/points/search/groups",
+        method="POST",
+        path_params={"collection_name": collection_name},
+        body={
+            "vector": [1.0, 0.0, 0.0, 0.0],
+            "limit": 10,
+            "with_payload": True,
+            "group_by": "docId",
+            "group_size": 3,
+        },
+    )
+    assert response.ok
+
+    response = request_with_validation(
+        api="/collections/{collection_name}/points/query/groups",
+        method="POST",
+        path_params={"collection_name": collection_name},
+        body={
+            "query": [1.0, 0.0, 0.0, 0.0],
+            "limit": 10,
+            "with_payload": True,
+            "group_by": "docId",
+            "group_size": 3,
+        },
+    )
+    assert response.ok
+
+    set_strict_mode(collection_name, {
+        "enabled": True,
+        "unindexed_filtering_retrieve": False,
+    })
+
+    # try again
+    response = request_with_validation(
+        api="/collections/{collection_name}/points/search/groups",
+        method="POST",
+        path_params={"collection_name": collection_name},
+        body={
+            "vector": [1.0, 0.0, 0.0, 0.0],
+            "limit": 10,
+            "with_payload": True,
+            "group_by": "docId",
+            "group_size": 3,
+        },
+    )
+
+    assert not response.ok
+    assert "Forbidden: Index required but not found for \"docId\". Help: Create an index for this key." in response.json()['status']['error']
+
+    response = request_with_validation(
+        api="/collections/{collection_name}/points/query/groups",
+        method="POST",
+        path_params={"collection_name": collection_name},
+        body={
+            "query": [1.0, 0.0, 0.0, 0.0],
+            "limit": 10,
+            "with_payload": True,
+            "group_by": "docId",
+            "group_size": 3,
+        },
+    )
+    assert not response.ok
+    assert "Forbidden: Index required but not found for \"docId\". Help: Create an index for this key." in response.json()['status']['error']
+
+    # create index
+    request_with_validation(
+        api='/collections/{collection_name}/index',
+        method="PUT",
+        path_params={'collection_name': collection_name},
+        query_params={'wait': 'true'},
+        body={
+            "field_name": "docId",
+            "field_schema": "keyword"
+        }
+    ).raise_for_status()
+
+    # now it is allowed
+    response = request_with_validation(
+        api="/collections/{collection_name}/points/search/groups",
+        method="POST",
+        path_params={"collection_name": collection_name},
+        body={
+            "vector": [1.0, 0.0, 0.0, 0.0],
+            "limit": 10,
+            "with_payload": True,
+            "group_by": "docId",
+            "group_size": 3,
+        },
+    )
+    assert response.ok
+
+    response = request_with_validation(
+        api="/collections/{collection_name}/points/query/groups",
+        method="POST",
+        path_params={"collection_name": collection_name},
+        body={
+            "query": [1.0, 0.0, 0.0, 0.0],
+            "limit": 10,
+            "with_payload": True,
+            "group_by": "docId",
+            "group_size": 3,
+        },
+    )
+    assert response.ok
