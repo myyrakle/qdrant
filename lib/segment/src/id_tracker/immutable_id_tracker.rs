@@ -380,7 +380,7 @@ impl IdTracker for ImmutableIdTracker {
             return Ok(());
         }
 
-        if self.internal_to_version.has(internal_id) {
+        if !self.internal_to_version.has(internal_id) {
             debug_assert!(false, "Can't extend version list in immutable tracker");
             return Ok(()); // TODO: Return error!?
         }
