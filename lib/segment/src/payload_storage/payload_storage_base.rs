@@ -78,7 +78,7 @@ pub trait PayloadStorage {
     fn files(&self) -> Vec<PathBuf>;
 
     /// Returns a list of files, which have additional versioning information. Versioned files
-    /// should be a subset of `PayloadStoreage::files` result (maybe with exception of RocksDB).
+    /// should be a subset of `PayloadStorage::files`.
     fn versioned_files(&self) -> Vec<(PathBuf, FileVersion)> {
         Vec::new()
     }
