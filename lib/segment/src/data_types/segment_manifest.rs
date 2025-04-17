@@ -90,6 +90,9 @@ impl SegmentManifest {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
+// `Unknown` and `Untagged` both serialize into `null`, but `null` always deserializes as `Unknown`.
+// This is acceptable, because partial snapshots don't need to distinguish `Unknown` and `Untagged`
+// in deserialized manifests, and it makes serde format simpler.
 pub enum FileVersion {
     Version(SeqNumberType),
     Unknown,
@@ -126,6 +129,11 @@ impl FileVersion {
     }
 
     pub fn from_u64(version: u64) -> Self {
+        // When encoding FileVersion into u64:
+        // - FileVersion::Unknown encodes to 0
+        // - FileVersion::Version(n) encodes to n+1
+        //   - e.g., Version(0) encodes to 1, Version(1) to 2, etc.
+
         if version == 0 {
             Self::Unknown
         } else {
@@ -134,6 +142,11 @@ impl FileVersion {
     }
 
     pub fn into_u64(self) -> u64 {
+        // When encoding FileVersion into u64:
+        // - FileVersion::Unknown encodes to 0
+        // - FileVersion::Version(n) encodes to n+1
+        //   - e.g., Version(0) encodes to 1, Version(1) to 2, etc.
+
         self.version().map_or(0, |version| version + 1)
     }
 
