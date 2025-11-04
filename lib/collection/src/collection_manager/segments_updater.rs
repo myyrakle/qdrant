@@ -623,6 +623,11 @@ pub(crate) fn process_point_operation(
             )?;
             Ok(deleted + new + updated)
         }
+        PointOperations::TruncatePoints => {
+            let mut segments_write = segments.write();
+            delete_all_points(&mut segments_write, op_num, hw_counter)?;
+            Ok(0)
+        }
     }
 }
 
@@ -732,6 +737,18 @@ pub(crate) fn process_field_index_operation(
 
 /// Max amount of points to delete in a batched deletion iteration.
 const DELETION_BATCH_SIZE: usize = 512;
+
+/// Tries to delete points from all segments, returns number of actually deleted points
+pub fn delete_all_points(
+    segments: &mut SegmentHolder,
+    _op_num: SeqNumberType,
+    _hw_counter: &HardwareCounterCell,
+) -> OperationResult<()> {
+    let segments_ids = segments.segment_ids();
+    segments.remove(&segments_ids);
+
+    Ok(())
+}
 
 /// Deletes points from all segments matching the given filter
 pub(crate) fn delete_points_by_filter(

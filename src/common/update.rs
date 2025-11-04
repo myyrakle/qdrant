@@ -280,16 +280,56 @@ pub async fn do_delete_points(
     _inference_token: InferenceToken,
     hw_measurement_acc: HwMeasurementAcc,
 ) -> Result<UpdateResult, StorageError> {
-    let (point_operation, shard_key) = match points {
+    let (operation, shard_key) = match points {
         PointsSelector::PointIdsSelector(PointIdsList { points, shard_key }) => {
             (PointOperations::DeletePoints { ids: points }, shard_key)
         }
         PointsSelector::FilterSelector(FilterSelector { filter, shard_key }) => {
             (PointOperations::DeletePointsByFilter(filter), shard_key)
         }
+        _ => {
+            return Err(StorageError::bad_request(
+                "Truncate operation cannot be performed with 'All' points selector. Use 'truncate' endpoint instead.",
+            ));
+        }
     };
 
-    let operation = CollectionUpdateOperations::PointOperation(point_operation);
+    let operation = CollectionUpdateOperations::PointOperation(operation);
+
+    update(
+        &toc,
+        &collection_name,
+        operation,
+        internal_params,
+        params,
+        shard_key,
+        access,
+        hw_measurement_acc,
+    )
+    .await
+}
+
+pub async fn do_truncate_points(
+    toc: Arc<TableOfContent>,
+    collection_name: String,
+    points: PointsSelector,
+    internal_params: InternalUpdateParams,
+    params: UpdateParams,
+    access: Access,
+    hw_measurement_acc: HwMeasurementAcc,
+) -> Result<UpdateResult, StorageError> {
+    let (operation, shard_key) = match points {
+        PointsSelector::AllSelector(AllSelector { shard_key }) => {
+            (PointOperations::TruncatePoints, shard_key)
+        }
+        _ => {
+            return Err(StorageError::bad_request(
+                "Truncate operation can only be performed with 'All' points selector.",
+            ));
+        }
+    };
+
+    let operation = CollectionUpdateOperations::PointOperation(operation);
 
     update(
         &toc,
@@ -532,6 +572,11 @@ pub async fn do_clear_payload(
         }
         PointsSelector::FilterSelector(FilterSelector { filter, shard_key }) => {
             (PayloadOps::ClearPayloadByFilter(filter), shard_key)
+        }
+        PointsSelector::AllSelector(_) => {
+            return Err(StorageError::bad_request(
+                "Clear payload operation cannot be performed with 'All' points selector.",
+            ));
         }
     };
 

@@ -59,7 +59,7 @@ use crate::shards::conversions::{
     internal_clear_payload, internal_clear_payload_by_filter, internal_create_index,
     internal_delete_index, internal_delete_payload, internal_delete_points,
     internal_delete_points_by_filter, internal_set_payload, internal_sync_points,
-    internal_upsert_points, try_scored_point_from_grpc,
+    internal_truncate_points, internal_upsert_points, try_scored_point_from_grpc,
 };
 use crate::shards::shard::{PeerId, ShardId};
 use crate::shards::shard_trait::ShardOperation;
@@ -314,6 +314,20 @@ impl RemoteShard {
                     )?;
                     self.with_points_client(|mut client| async move {
                         client.sync(tonic::Request::new(request.clone())).await
+                    })
+                    .await?
+                    .into_inner()
+                }
+                PointOperations::TruncatePoints => {
+                    let request = &internal_truncate_points(
+                        shard_id,
+                        operation.clock_tag,
+                        collection_name,
+                        wait,
+                        ordering,
+                    )?;
+                    self.with_points_client(|mut client| async move {
+                        client.truncate(tonic::Request::new(request.clone())).await
                     })
                     .await?
                     .into_inner()

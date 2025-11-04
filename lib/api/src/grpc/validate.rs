@@ -568,3 +568,19 @@ mod tests {
         );
     }
 }
+
+impl Validate for grpc::TruncatePointsInternal {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        if let Some(truncate_points) = &self.truncate_points {
+            if truncate_points.collection_name.is_empty() {
+                let mut errors = ValidationErrors::new();
+                errors.add(
+                    "collection_name",
+                    ValidationError::new("collection_name cannot be empty"),
+                );
+                return Err(errors);
+            }
+        }
+        Ok(())
+    }
+}

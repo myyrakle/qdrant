@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use api::grpc::TruncatePointsInternal;
 use api::grpc::qdrant::points_internal_server::PointsInternal;
 use api::grpc::qdrant::{
     ClearPayloadPointsInternal, CoreSearchBatchPointsInternal, CountPointsInternal, CountResponse,
@@ -49,6 +50,53 @@ impl PointsInternalService {
             toc,
             service_config,
         }
+    }
+
+    async fn truncate_internal(
+        &self,
+
+        truncate_points_internal: TruncatePointsInternal,
+    ) -> Result<Response<PointsOperationResponseInternal>, Status> {
+        let TruncatePointsInternal {
+            truncate_points,
+
+            shard_id,
+
+            clock_tag,
+        } = truncate_points_internal;
+
+        let truncate_points = extract_internal_request(truncate_points)?;
+
+        let hw_metrics = self.get_request_collection_hw_usage_counter_for_internal(
+            truncate_points.collection_name.clone(),
+        );
+
+        truncate(
+            StrictModeCheckedInternalTocProvider::new(&self.toc),
+            truncate_points,
+            InternalUpdateParams::from_grpc(shard_id, clock_tag),
+            FULL_ACCESS.clone(),
+            hw_metrics,
+        )
+        .await
+    }
+
+    async fn delete_field_index_internal(
+        &self,
+        delete_field_index_collection: DeleteFieldIndexCollectionInternal,
+    ) -> Result<Response<PointsOperationResponseInternal>, Status> {
+        let DeleteFieldIndexCollectionInternal {
+            delete_field_index_collection,
+            shard_id,
+            clock_tag,
+        } = delete_field_index_collection;
+
+        delete_field_index_internal(
+            self.toc.clone(),
+            extract_internal_request(delete_field_index_collection)?,
+            InternalUpdateParams::from_grpc(shard_id, clock_tag),
+        )
+        .await
     }
 }
 
@@ -234,6 +282,15 @@ impl PointsInternal for PointsInternalService {
             hw_metrics,
         )
         .await
+    }
+
+    async fn truncate(
+        &self,
+        request: Request<TruncatePointsInternal>,
+    ) -> Result<Response<PointsOperationResponseInternal>, Status> {
+        validate_and_log(request.get_ref());
+
+        self.truncate_internal(request.into_inner()).await
     }
 
     async fn update_vectors(
@@ -433,18 +490,7 @@ impl PointsInternal for PointsInternalService {
     ) -> Result<Response<PointsOperationResponseInternal>, Status> {
         validate_and_log(request.get_ref());
 
-        let DeleteFieldIndexCollectionInternal {
-            delete_field_index_collection,
-            shard_id,
-            clock_tag,
-        } = request.into_inner();
-
-        delete_field_index_internal(
-            self.toc.clone(),
-            extract_internal_request(delete_field_index_collection)?,
-            InternalUpdateParams::from_grpc(shard_id, clock_tag),
-        )
-        .await
+        self.delete_field_index_internal(request.into_inner()).await
     }
 
     async fn core_search_batch(

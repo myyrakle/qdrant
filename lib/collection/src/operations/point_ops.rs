@@ -433,6 +433,13 @@ pub struct FilterSelector {
     pub shard_key: Option<ShardKeySelector>,
 }
 
+#[derive(Debug, Deserialize, Serialize, JsonSchema, Validate)]
+#[serde(rename_all = "snake_case")]
+pub struct AllSelector {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shard_key: Option<ShardKeySelector>,
+}
+
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(untagged, rename_all = "snake_case")]
 pub enum PointsSelector {
@@ -440,6 +447,7 @@ pub enum PointsSelector {
     PointIdsSelector(PointIdsList),
     /// Select points by filtering condition
     FilterSelector(FilterSelector),
+    AllSelector(AllSelector),
 }
 
 impl Validate for PointsSelector {
@@ -447,6 +455,7 @@ impl Validate for PointsSelector {
         match self {
             PointsSelector::PointIdsSelector(ids) => ids.validate(),
             PointsSelector::FilterSelector(filter) => filter.validate(),
+            PointsSelector::AllSelector(all) => all.validate(),
         }
     }
 }
@@ -689,6 +698,8 @@ pub enum PointOperations {
     DeletePointsByFilter(Filter),
     /// Points Sync
     SyncPoints(PointSyncOperation),
+    /// Truncate all points
+    TruncatePoints,
 }
 
 impl PointOperations {
@@ -698,6 +709,7 @@ impl PointOperations {
             PointOperations::DeletePoints { .. } => false,
             PointOperations::DeletePointsByFilter(_) => false,
             PointOperations::SyncPoints(_) => true,
+            PointOperations::TruncatePoints => true,
         }
     }
 
@@ -707,6 +719,7 @@ impl PointOperations {
             Self::DeletePoints { ids } => Some(ids.clone()),
             Self::DeletePointsByFilter(_) => None,
             Self::SyncPoints(op) => Some(op.points.iter().map(|point| point.id).collect()),
+            Self::TruncatePoints => None,
         }
     }
 
@@ -719,6 +732,7 @@ impl PointOperations {
             Self::DeletePoints { ids } => ids.retain(filter),
             Self::DeletePointsByFilter(_) => (),
             Self::SyncPoints(op) => op.points.retain(|point| filter(&point.id)),
+            Self::TruncatePoints => (),
         }
     }
 }
@@ -919,6 +933,9 @@ impl SplitByShard for PointOperations {
                 panic!("SyncPoints operation is intended to by applied to specific shard only");
                 #[cfg(not(debug_assertions))]
                 OperationToShard::by_shard(vec![])
+            }
+            PointOperations::TruncatePoints => {
+                OperationToShard::to_all(PointOperations::TruncatePoints)
             }
         }
     }
