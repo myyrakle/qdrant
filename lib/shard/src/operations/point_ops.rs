@@ -105,6 +105,8 @@ pub enum PointOperations {
     DeletePointsByFilter(Filter),
     /// Points Sync
     SyncPoints(PointSyncOperation),
+    /// Truncate points
+    TruncatePoints,
 }
 
 impl PointOperations {
@@ -115,6 +117,7 @@ impl PointOperations {
             PointOperations::DeletePoints { .. } => false,
             PointOperations::DeletePointsByFilter(_) => false,
             PointOperations::SyncPoints(_) => true,
+            PointOperations::TruncatePoints => true,
         }
     }
 
@@ -125,6 +128,7 @@ impl PointOperations {
             Self::DeletePoints { ids } => Some(ids.clone()),
             Self::DeletePointsByFilter(_) => None,
             Self::SyncPoints(op) => Some(op.points.iter().map(|point| point.id).collect()),
+            Self::TruncatePoints => None,
         }
     }
 
@@ -140,6 +144,7 @@ impl PointOperations {
             Self::DeletePoints { ids } => ids.retain(filter),
             Self::DeletePointsByFilter(_) => (),
             Self::SyncPoints(op) => op.points.retain(|point| filter(&point.id)),
+            Self::TruncatePoints => (),
         }
     }
 }
@@ -396,6 +401,9 @@ pub struct ConditionalInsertOperationInternal {
     /// Condition to check, if the point already exists
     pub condition: Filter,
 }
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Hash)]
+pub struct TruncateOperation {}
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Hash)]
 pub struct PointSyncOperation {

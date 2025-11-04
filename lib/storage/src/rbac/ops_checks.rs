@@ -469,6 +469,9 @@ impl CheckableCollectionOperation for CollectionUpdateOperations {
                 PointOperations::SyncPoints(_) => {
                     view.check_whole_access()?;
                 }
+                PointOperations::TruncatePoints => {
+                    view.check_whole_access()?;
+                }
             },
 
             CollectionUpdateOperations::VectorOperation(op) => match op {
@@ -1208,6 +1211,12 @@ mod tests_ops {
                         ids: vec![ExtendedPointId::NumId(12345)],
                     });
                 check_collection_update_operations_delete_points(&op);
+            }
+
+            PointOperationsDiscriminants::TruncatePoints => {
+                let op =
+                    CollectionUpdateOperations::PointOperation(PointOperations::TruncatePoints);
+                assert_requires_whole_write_access(&op);
             }
 
             PointOperationsDiscriminants::DeletePointsByFilter => {
